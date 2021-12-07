@@ -24,7 +24,7 @@ player.on('trackStart', (queue, track) => {
 		.setTitle(track.title)
 		.setURL(track.url)
 		.setFields([{ name: track.author, value: track.duration, inline: true }, { name: `Requested by`, value: `${track.requestedBy} `, inline: true }])
-		.setImage(track.thumbnail)
+		.setImage(`https://i.ytimg.com/vi/${track.raw.id}/maxresdefault.jpg`)
 		.setFooter(`${queue.tracks.length} songs in playlist.`);
 	client.Menu.edit({ content: updateQueue(queue), embeds: [Playing] });
 });
