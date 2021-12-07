@@ -19,7 +19,7 @@ class MusicPlayer extends Player {
     };
 
     async play(message) {
-        const query = message.content;
+        let query = message.content;
         const requestVC = this.getVC(message, message.author.id);
         const selfVC = this.getVC(message, this.client.user.id);
 
@@ -53,7 +53,15 @@ class MusicPlayer extends Player {
             return sendThenDelete(message, 'Could not join your voice channel!');
         };
 
-        if (PlaylistRegex.test(query)) {
+        if (VideoRegex.test(query)) {
+            query = VideoRegex.exec(query)[1];
+            const track = await this.search(query, {
+                requestedBy: message.author
+            }).then(x => x.tracks[0]);
+
+            this.client.queue.addTrack(track);
+        }
+        else if (PlaylistRegex.test(query)) {
             const tracks = await this.search(query, {
                 requestedBy: message.author
             }).then(x => x);
@@ -64,9 +72,6 @@ class MusicPlayer extends Player {
             this.client.queue.addTracks(tracks.tracks);
         }
         else {
-            if (VideoRegex.test(query))
-                query = VideoRegex.exec(query)[1];
-
             const track = await this.search(query, {
                 requestedBy: message.author
             }).then(x => x.tracks[0]);
@@ -155,11 +160,11 @@ class MusicPlayer extends Player {
             return false;
         };
     };
-    
+
     checkVC(m, u) {
         const requestVC = this.getVC(m, u.id);
         const selfVC = this.getVC(m, this.client.user.id);
-    
+
         return !((!requestVC) && (!(selfVC == requestVC) && selfVC));
     };
 };
