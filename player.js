@@ -59,6 +59,9 @@ class MusicPlayer extends Player {
                 requestedBy: message.author
             }).then(x => x.tracks[0]);
 
+            if (!track)
+                return sendThenDelete(message, `❌ | **${query}** not found!`, 10000);
+
             this.client.queue.addTrack(track);
         }
         else if (PlaylistRegex.test(query)) {
@@ -75,6 +78,9 @@ class MusicPlayer extends Player {
             const track = await this.search(query, {
                 requestedBy: message.author
             }).then(x => x.tracks[0]);
+
+            if (!track)
+                return sendThenDelete(message, `❌ | **${query}** not found!`, 10000);
 
             this.client.queue.addTrack(track);
         };
