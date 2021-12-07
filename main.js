@@ -16,7 +16,7 @@ const player = new MusicPlayer(client);
 const NothingPlaying = new MessageEmbed()
 	.setColor('#f1e0ff')
 	.setTitle('Current Not Playing')
-	.setImage('https://i.imgur.com/xGIAI1T.png');
+	.setImage('https://i.imgur.com/IPNgl72.gif');
 
 player.on('trackStart', (queue, track) => {
 	const Playing = new MessageEmbed()
@@ -99,7 +99,7 @@ async function addControl(msg) {
 
 	const filter = (reaction, user) => {
 		return _CONTROLS.has(reaction.emoji.toString()) && !user.bot;
-	};
+	}
 
 	const collector = msg.createReactionCollector({ filter });
 	collector.on('collect', (reaction, user) => {
@@ -120,15 +120,16 @@ client.once('ready', (c) => {
 client.on('messageCreate', (m) => {
 	if (m.channelId == '917380661785010206') {
 		if (m.author.bot) return;
-		if (client.Ch == null) {
+		if (client.Ch == null)
 			client.Ch = m.channel;
-		}
 		if (m.content.startsWith('.')) {
 			const command = m.content.slice(1);
 			if (m.author.id == process.env.OWNER && command == 'init')
 				initMenu(m);
-			else if (command.startsWith('bump'))
+			else if (command.startsWith('bump') || command.startsWith('move'))
 				player.bump(m, command.slice(4).trim());
+			else if (command.startsWith('mv'))
+				player.bump(m, command.slice(2).trim());
 			else if (command.startsWith('remove'))
 				player.remove(m, command.slice(6).trim());
 			else if (command.startsWith('rm'))
@@ -140,7 +141,7 @@ client.on('messageCreate', (m) => {
 			}
 
 			player.play(m);
-		};
+		}
 		m.delete();
 	}
 });

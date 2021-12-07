@@ -16,7 +16,7 @@ class MusicPlayer extends Player {
             '🔀': this.shuffle,
             '🚮': this.clear,
         }));
-    };
+    }
 
     async play(message) {
         let query = message.content;
@@ -51,7 +51,7 @@ class MusicPlayer extends Player {
         } catch {
             this.client.queue.destroy();
             return sendThenDelete(message, 'Could not join your voice channel!');
-        };
+        }
 
         if (VideoRegex.test(query)) {
             query = VideoRegex.exec(query)[1];
@@ -83,11 +83,11 @@ class MusicPlayer extends Player {
                 return sendThenDelete(message, `❌ | **${query}** not found!`, 10000);
 
             this.client.queue.addTrack(track);
-        };
+        }
 
         if (!this.client.queue.playing)
             this.client.queue.play();
-    };
+    }
 
     pause(m, u) {
         if (!this.checkVC(m, u)) return;
@@ -96,8 +96,8 @@ class MusicPlayer extends Player {
             this.client.queue.setPaused(this.client.Paused);
         } catch (e) {
             console.error(e);
-        };
-    };
+        }
+    }
 
     skip(m, u) {
         if (!this.checkVC(m, u)) return;
@@ -105,8 +105,8 @@ class MusicPlayer extends Player {
             this.client.queue.skip();
         } catch (e) {
             console.error(e);
-        };
-    };
+        }
+    }
 
     stop(m, u) {
         if (!this.checkVC(m, u)) return;
@@ -115,8 +115,8 @@ class MusicPlayer extends Player {
             this.emit('stopped', this.client.queue);
         } catch (e) {
             console.error(e);
-        };
-    };
+        }
+    }
 
     shuffle(m, u) {
         if (!this.checkVC(m, u)) return;
@@ -125,8 +125,8 @@ class MusicPlayer extends Player {
             this.emit('shuffled', this.client.queue);
         } catch (e) {
             console.error(e);
-        };
-    };
+        }
+    }
 
     clear(m, u) {
         if (!this.checkVC(m, u)) return;
@@ -135,8 +135,8 @@ class MusicPlayer extends Player {
             this.emit('cleared', this.client.queue);
         } catch (e) {
             console.error(e);
-        };
-    };
+        }
+    }
 
     bump(m, pos) {
         if (!this.checkVC(m, m.author)) return;
@@ -146,8 +146,8 @@ class MusicPlayer extends Player {
             this.emit('queueUpdated', this.client.queue);
         } catch (e) {
             console.error(e);
-        };
-    };
+        }
+    }
 
     remove(m, pos) {
         if (!this.checkVC(m, m.author)) return;
@@ -156,24 +156,24 @@ class MusicPlayer extends Player {
             this.emit('queueUpdated', this.client.queue);
         } catch (e) {
             console.error(e);
-        };
-    };
+        }
+    }
 
     getVC(m, id) {
         try {
             return m.channel.guild.voiceStates.cache.get(id).channel;
         } catch {
             return false;
-        };
-    };
+        }
+    }
 
     checkVC(m, u) {
         const requestVC = this.getVC(m, u.id);
         const selfVC = this.getVC(m, this.client.user.id);
 
-        return !((!requestVC) && (!(selfVC == requestVC) && selfVC));
-    };
-};
+        return requestVC && (selfVC == requestVC);
+    }
+}
 
 function updateQueue(queue) {
     const list = queue.tracks.slice(0, 20).reverse();
