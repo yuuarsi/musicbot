@@ -19,12 +19,12 @@ const NothingPlaying = new MessageEmbed()
 	.setImage('https://i.imgur.com/IPNgl72.gif');
 
 player.on('trackStart', (queue, track) => {
-	const Playing = new MessageEmbed()
-		.setColor('#f1e0ff')
-		.setTitle(track.title)
+	const Playing = client.Menu.embeds[0];
+	Playing.setTitle(track.title)
 		.setURL(track.url)
-		.setFields([{ name: track.author, value: track.duration, inline: true }, { name: `Requested by`, value: `${track.requestedBy} `, inline: true }])
-		.setImage(`https://i.ytimg.com/vi/${track.raw.id}/maxresdefault.jpg`)
+		.setDescription(`Requested by ${track.requestedBy}`)
+		.setFields([{ name: 'Channel', value: `[${track.author}](${track.raw.videoDetails.ownerProfileUrl})`, inline: true }, { name: `Duration`, value: `${(track.raw.videoDetails.isLive) ? 'Live' :track.duration}`, inline: true }])
+		.setImage(track.raw.videoDetails.thumbnails.at(-1).url)
 		.setFooter(`${queue.tracks.length} songs in playlist.`);
 	client.Menu.edit({ content: updateQueue(queue), embeds: [Playing] });
 });
@@ -58,14 +58,19 @@ player.on('shuffled', (queue) => {
 });
 
 player.on('cleared', (queue) => {
+	const update = client.Menu.embeds[0];
+	update.setFooter(`${queue.tracks.length} songs in playlist.`)
 	client.Menu.edit({ content: updateQueue(queue), embeds: client.Menu.embeds });
 });
 
 player.on('queueUpdated', (queue) => {
-	client.Menu.edit({ content: updateQueue(queue), embeds: client.Menu.embeds });
+	const update = client.Menu.embeds[0];
+	update.setFooter(`${queue.tracks.length} songs in playlist.`)
+	client.Menu.edit({ content: updateQueue(queue), embeds: [update] });
 });
 
 player.on('error', (_, error) => {
+	if (error.name == 'DestroyedQueue') return;
 	console.error(error);
 });
 
@@ -120,26 +125,38 @@ client.once('ready', (c) => {
 client.on('messageCreate', (m) => {
 	if (m.channelId == '917380661785010206') {
 		if (m.author.bot) return;
-		if (client.Ch == null)
+		if (client.Ch === null)
 			client.Ch = m.channel;
+		if (client.Menu === null)
+			initMenu(m);
 		if (m.content.startsWith('.')) {
-			const command = m.content.slice(1);
+			let command = m.content.slice(1);
 			if (m.author.id == process.env.OWNER && command == 'init')
 				initMenu(m);
+			else if (m.author.id == process.env.OWNER && command == 'dc')
+				player.getQueue(m.author.id).destroy();
 			else if (command.startsWith('bump') || command.startsWith('move'))
 				player.bump(m, command.slice(4).trim());
 			else if (command.startsWith('mv'))
 				player.bump(m, command.slice(2).trim());
-			else if (command.startsWith('remove'))
-				player.remove(m, command.slice(6).trim());
-			else if (command.startsWith('rm'))
-				player.remove(m, command.slice(2).trim());
+			else if (command.startsWith('remove')) {
+				command = command.slice(6).trim();
+				if (command == 'double' || command == 'dupl')
+					player.removeDuplicate(m);
+				else
+					player.remove(m, command);
+			}
+			else if (command.startsWith('rm')) {
+				command = command.slice(2).trim();
+				if (command == 'double' || command == 'dupl')
+					player.removeDuplicate(m);
+				else
+					player.remove(m, command);
+			}
+			else if (command.startsWith('clear'))
+				player.clear(m);
 		}
 		else {
-			if (client.Menu == null) {
-				initMenu(m);
-			}
-
 			player.play(m);
 		}
 		m.delete();

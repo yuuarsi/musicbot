@@ -10,11 +10,11 @@ class MusicPlayer extends Player {
     constructor(client, options = {}) {
         super(client, options);
         this.CONTROLS = new Collection(Object.entries({
+            '⏮️': this.prev,
             '⏯️': this.pause,
             '⏭️': this.skip,
             '⏹️': this.stop,
             '🔀': this.shuffle,
-            '🚮': this.clear,
         }));
     }
 
@@ -99,6 +99,16 @@ class MusicPlayer extends Player {
         }
     }
 
+    prev(m, u) {
+        if (!this.checkVC(m, u)) return;
+        try {
+            if (this.client.queue.previousTracks.length < 2) return;
+            this.client.queue.back();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
     skip(m, u) {
         if (!this.checkVC(m, u)) return;
         try {
@@ -128,11 +138,12 @@ class MusicPlayer extends Player {
         }
     }
 
-    clear(m, u) {
-        if (!this.checkVC(m, u)) return;
+    clear(m) {
+        if (!this.checkVC(m, m.author)) return;
         try {
             this.client.queue.clear();
             this.emit('cleared', this.client.queue);
+            sendThenDelete(m, `Playlist was cleared by ${m.author}`, 10000);
         } catch (e) {
             console.error(e);
         }
@@ -152,7 +163,24 @@ class MusicPlayer extends Player {
     remove(m, pos) {
         if (!this.checkVC(m, m.author)) return;
         try {
-            this.client.queue.remove(Number(pos) - 1);
+            const track = this.client.queue.remove(Number(pos) - 1);
+            console.log(track);
+            sendThenDelete(m, `[${track.title}](${track.url}) was removed by ${m.author}.`);
+            this.emit('queueUpdated', this.client.queue);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    removeDuplicate(m) {
+        if (!this.checkVC(m, m.author)) return;
+        try {
+            const newQueue = uniqBy(this.client.queue.tracks, k => k.raw.id);
+            const old = this.client.queue.tracks.length
+            this.client.queue.tracks = newQueue;
+
+            if (old - newQueue.length > 0)
+                sendThenDelete(m, `${old - newQueue.length} duplicated songs removed by ${m.author}.`, 10000);
             this.emit('queueUpdated', this.client.queue);
         } catch (e) {
             console.error(e);
@@ -206,6 +234,14 @@ function shuffle(array) {
     }
 
     return array;
+}
+
+function uniqBy(a, key) {
+    var seen = {};
+    return a.filter(function (item) {
+        var k = key(item);
+        return seen.hasOwnProperty(k) ? false : (seen[k] = true);
+    })
 }
 
 module.exports = { MusicPlayer, updateQueue };
