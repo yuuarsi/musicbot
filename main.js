@@ -20,11 +20,21 @@ const NothingPlaying = new MessageEmbed()
 
 player.on('trackStart', (queue, track) => {
 	const Playing = client.Menu.embeds[0];
+	let channelUrl, duration;
+	try {
+		channelUrl = track.raw.videoDetails.ownerProfileUrl;
+		duration = `${(track.raw.videoDetails.isLive) ? 'Live' : track.duration}`;
+	}
+	catch {
+		channelUrl = track.raw.channel.url;
+		duration = track.duration;
+	}
+
 	Playing.setTitle(track.title)
 		.setURL(track.url)
 		.setDescription(`Requested by ${track.requestedBy}`)
-		.setFields([{ name: 'Channel', value: `[${track.author}](${track.raw.videoDetails.ownerProfileUrl})`, inline: true }, { name: `Duration`, value: `${(track.raw.videoDetails.isLive) ? 'Live' :track.duration}`, inline: true }])
-		.setImage(track.raw.videoDetails.thumbnails.at(-1).url)
+		.setFields([{ name: 'Channel', value: `[${track.author}](${channelUrl})`, inline: true }, { name: `Duration`, value: duration, inline: true }])
+		.setImage(track.thumbnail)
 		.setFooter(`${queue.tracks.length} songs in playlist.`);
 	client.Menu.edit({ content: updateQueue(queue), embeds: [Playing] });
 });

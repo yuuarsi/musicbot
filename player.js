@@ -165,7 +165,7 @@ class MusicPlayer extends Player {
         try {
             const track = this.client.queue.remove(Number(pos) - 1);
             console.log(track);
-            sendThenDelete(m, `[${track.title}](${track.url}) was removed by ${m.author}.`);
+            sendThenDelete(m, `[${track.title}](${track.url}) was removed by ${m.author}`);
             this.emit('queueUpdated', this.client.queue);
         } catch (e) {
             console.error(e);
