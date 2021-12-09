@@ -161,10 +161,16 @@ client.on('messageCreate', (m) => {
 			initMenu(m);
 		if (m.content.startsWith('.')) {
 			let command = m.content.slice(1);
-			if (m.author.id == process.env.OWNER && command == 'init')
-				initMenu(m);
-			else if (m.author.id == process.env.OWNER && command == 'dc')
-				player.emit('botDisconnect', player.getQueue(m.guildId));
+			if (m.author.id == process.env.OWNER) {
+				if (command == 'init')
+					initMenu(m);
+				else if (command == 'dc')
+					player.emit('botDisconnect', player.getQueue(m.guildId));
+				else if (command.startsWith('setImg')) {
+					command = command.slice(6).trim();
+					emptyImg = command;
+				}
+			}
 			else if (command.startsWith('bump') || command.startsWith('move'))
 				player.bump(m, command.slice(4).trim());
 			else if (command.startsWith('mv'))
@@ -185,10 +191,6 @@ client.on('messageCreate', (m) => {
 			}
 			else if (command.startsWith('clear'))
 				player.clear(m);
-			else if (command.startsWith('setImg')) {
-				command = command.slice(6).trim();
-				emptyImg = command;
-			}
 		}
 		else {
 			player.play(m);
