@@ -1,10 +1,24 @@
 const { Collection } = require('discord.js');
-const { Player } = require('discord-player');
+const { Player, Util } = require('discord-player');
 const { sendThenDelete } = require('./util');
 const playdl = require('play-dl');
 
 const VideoRegex = /(((?:https?:)\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))((?!channel)(?!user)\/(?:[\w\-]+\?v=|embed\/|v\/)?)((?!playlist)(?!channel)(?!user)[\w\-]+))(\S+)?$/;
 const PlaylistRegex = /((?:https?:)\/\/)?((?:www|m)\.)?((?:youtube\.com)).*(youtu.be\/|list=)([^#&?]*).*/;
+
+const OPTIONS = {
+    leaveOnEnd: false,
+    leaveOnEmptyCooldown: 60000,
+    disableVolume: true,
+    onBeforeCreateStream: async function (track, source, _queue) {
+        // only trap youtube source
+        if (source === "youtube") {
+            // track here would be youtube track
+            return (await playdl.stream(track.url)).stream;
+            // we must return readable stream or void (returning void means telling discord-player to look for default extractor)
+        }
+    }
+};
 
 class MusicPlayer extends Player {
     constructor(client, options = {}) {
@@ -16,6 +30,35 @@ class MusicPlayer extends Player {
             '⏹️': this.stop,
             '🔀': this.shuffle,
         }));
+
+        // handle some state change that discord-player didnt do
+        this.client.on('voiceStateUpdate', (oldState, newState) => {
+
+            // bot got disconnected
+            if (oldState.id === client.user.id && newState.channelId === null)
+                this.emit('botDisconnect', this.getQueue(oldState.guild.id));
+
+            // repair leave on empty
+            const queue = this.getQueue(oldState.guild.id);
+            if (!queue)
+                return;
+            if (!queue.connection || !queue.connection.channel)
+                return;
+            if (oldState.channelId === queue.connection.channel.id) {
+                if (!Util.isVoiceEmpty(queue.connection.channel))
+                    return;
+                const timeout = setTimeout(() => {
+                    if (!Util.isVoiceEmpty(queue.connection.channel))
+                        return;
+                    if (!this.queues.has(queue.guild.id))
+                        return;
+                    if (queue.options.leaveOnEmpty)
+                        queue.destroy();
+                    this.emit('channelEmpty', queue);
+                }, queue.options.leaveOnEmptyCooldown || 0).unref();
+                queue._cooldownsTimeout.set(`empty_${oldState.guild.id}`, timeout);
+            }
+        })
     }
 
     async play(message) {
@@ -28,22 +71,7 @@ class MusicPlayer extends Player {
         if (!(selfVC == requestVC) && selfVC)
             return sendThenDelete(message, 'You are not in my voice channel!');
 
-        this.client.queue = this.createQueue(message.guild, {
-            metadata: {
-                channel: requestVC,
-            },
-            leaveOnEnd: false,
-            leaveOnEmptyCooldown: 60000,
-            disableVolume: true,
-            onBeforeCreateStream: async function (track, source, _queue) {
-                // only trap youtube source
-                if (source === "youtube") {
-                    // track here would be youtube track
-                    return (await playdl.stream(track.url)).stream;
-                    // we must return readable stream or void (returning void means telling discord-player to look for default extractor)
-                }
-            }
-        })
+        this.client.queue = this.createQueue(message.guild, Object.assign({ metadata: { channel: requestVC } }, OPTIONS))
 
         try {
             if (!this.client.queue.connection)
@@ -52,6 +80,9 @@ class MusicPlayer extends Player {
             this.client.queue.destroy();
             return sendThenDelete(message, 'Could not join your voice channel!');
         }
+
+        let startPlay = false;
+        if (!this.client.queue.tracks.length && !this.client.queue.playing) startPlay = true;
 
         if (VideoRegex.test(query)) {
             query = VideoRegex.exec(query)[1];
@@ -85,7 +116,7 @@ class MusicPlayer extends Player {
             this.client.queue.addTrack(track);
         }
 
-        if (!this.client.queue.playing)
+        if (startPlay)
             this.client.queue.play();
     }
 

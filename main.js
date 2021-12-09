@@ -13,10 +13,13 @@ const client = new Client({
 });
 const player = new MusicPlayer(client);
 
-const NothingPlaying = new MessageEmbed()
-	.setColor('#f1e0ff')
-	.setTitle('Current Not Playing')
-	.setImage('https://i.imgur.com/IPNgl72.gif');
+let emptyImg = 'https://i.imgur.com/IPNgl72.gif';
+const NothingPlaying = () => {
+	return new MessageEmbed()
+		.setColor('#f1e0ff')
+		.setTitle('Current Not Playing')
+		.setImage(emptyImg);
+}
 
 player.on('trackStart', (queue, track) => {
 	const Playing = client.Menu.embeds[0];
@@ -39,6 +42,18 @@ player.on('trackStart', (queue, track) => {
 	client.Menu.edit({ content: updateQueue(queue), embeds: [Playing] });
 });
 
+player.on('trackSwitch', (queue, track) => {
+	const Playing = client.Menu.embeds[0];
+
+	Playing.setTitle(track.title)
+		.setURL(track.url)
+		.setDescription(`Connecting...`)
+		.setFields([])
+		.setImage(track.thumbnail)
+		.setFooter(`${queue.tracks.length} songs in playlist.`);
+	client.Menu.edit({ content: updateQueue(queue), embeds: [Playing] });
+});
+
 player.on('trackAdd', (queue, track) => {
 	const Adding = client.Menu.embeds[0];
 	Adding.setFooter(`${queue.tracks.length} songs in playlist.`)
@@ -52,15 +67,20 @@ player.on('tracksAdd', (queue, tracks) => {
 });
 
 player.on('queueEnd', (_) => {
-	client.Menu.edit({ content: ' ', embeds: [NothingPlaying] });
+	client.Menu.edit({ content: ' ', embeds: [NothingPlaying()] });
 });
 
 player.on('botDisconnect', (_) => {
-	client.Menu.edit({ content: ' ', embeds: [NothingPlaying] });
+	// ensure queue is deleted after disconnect
+	try {
+		player.client.queue.destroy();
+	} catch { }
+
+	client.Menu.edit({ content: ' ', embeds: [NothingPlaying()] });
 });
 
 player.on('stopped', (_) => {
-	client.Menu.edit({ content: ' ', embeds: [NothingPlaying] });
+	client.Menu.edit({ content: ' ', embeds: [NothingPlaying()] });
 });
 
 player.on('shuffled', (queue) => {
@@ -93,9 +113,9 @@ player.on('debug', (_, msg) => {
 });
 
 function initMenu(msg) {
-	msg.channel.bulkDelete(50)
+	msg.channel.bulkDelete(10)
 		.then(() => {
-			msg.channel.send({ embeds: [NothingPlaying] })
+			msg.channel.send({ embeds: [NothingPlaying()] })
 				.then(menu => {
 					client.MenuID = menu.id;
 					client.Menu = menu;
@@ -125,7 +145,7 @@ async function addControl(msg) {
 }
 
 client.once('ready', (c) => {
-	console.log('Ready!');
+	console.log(`Ready! Logged in as ${c.user.tag}`);
 	client.MenuID = null;
 	client.Menu = null;
 	client.Ch = null;
@@ -144,7 +164,7 @@ client.on('messageCreate', (m) => {
 			if (m.author.id == process.env.OWNER && command == 'init')
 				initMenu(m);
 			else if (m.author.id == process.env.OWNER && command == 'dc')
-				player.getQueue(m.author.id).destroy();
+				player.emit('botDisconnect', player.getQueue(m.guildId));
 			else if (command.startsWith('bump') || command.startsWith('move'))
 				player.bump(m, command.slice(4).trim());
 			else if (command.startsWith('mv'))
@@ -165,11 +185,15 @@ client.on('messageCreate', (m) => {
 			}
 			else if (command.startsWith('clear'))
 				player.clear(m);
+			else if (command.startsWith('setImg')) {
+				command = command.slice(6).trim();
+				emptyImg = command;
+			}
 		}
 		else {
 			player.play(m);
 		}
-		m.delete();
+		m.delete().catch();
 	}
 });
 
