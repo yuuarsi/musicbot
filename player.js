@@ -2,7 +2,6 @@ const { Collection } = require('discord.js');
 const { Player, Util } = require('discord-player');
 const { sendThenDelete } = require('./util');
 const playdl = require('play-dl');
-
 const VideoRegex = /(((?:https?:)\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))((?!channel)(?!user)\/(?:[\w\-]+\?v=|embed\/|v\/)?)((?!playlist)(?!channel)(?!user)[\w\-]+))(\S+)?$/;
 const PlaylistRegex = /((?:https?:)\/\/)?((?:www|m)\.)?((?:youtube\.com)).*(youtu.be\/|list=)([^#&?]*).*/;
 
@@ -11,11 +10,18 @@ const OPTIONS = {
     leaveOnEmptyCooldown: 60000,
     disableVolume: true,
     onBeforeCreateStream: async function (track, source, _queue) {
-        // only trap youtube source
         if (source === "youtube") {
-            // track here would be youtube track
+
+            // test video's availability
+            try {
+                (await playdl.stream(track.url)).stream.destroy();
+            }
+            catch (e) { 
+                _queue.player.emit('playError', _queue, track, e);
+            };
+
+
             return (await playdl.stream(track.url)).stream;
-            // we must return readable stream or void (returning void means telling discord-player to look for default extractor)
         }
     }
 };
@@ -82,42 +88,33 @@ class MusicPlayer extends Player {
         }
 
         let startPlay = false;
-        if (!this.client.queue.tracks.length && !this.client.queue.playing) startPlay = true;
+        if (!this.client.queue.tracks.length && !this.client.queue.playing && !this.client.queue.current) startPlay = true;
 
+        let tracks
         if (VideoRegex.test(query)) {
             query = VideoRegex.exec(query)[1];
-            const track = await this.search(query, {
-                requestedBy: message.author
-            }).then(x => x.tracks[0]);
-
-            if (!track)
-                return sendThenDelete(message, `❌ | **${query}** not found!`, 10000);
-
-            this.client.queue.addTrack(track);
-        }
-        else if (PlaylistRegex.test(query)) {
-            const tracks = await this.search(query, {
+            tracks = await this.search(query, {
                 requestedBy: message.author
             }).then(x => x);
-
-            if (tracks.tracks.length < 1)
-                return sendThenDelete(message, `❌ | **${query}** not found!`, 10000);
-
-            this.client.queue.addTracks(tracks.tracks);
+        }
+        else if (PlaylistRegex.test(query)) {
+            tracks = await this.search(query, {
+                requestedBy: message.author
+            }).then(x => x);
         }
         else {
-            const track = await this.search(query, {
+            tracks = await this.search(query, {
                 requestedBy: message.author
-            }).then(x => x.tracks[0]);
-
-            if (!track)
-                return sendThenDelete(message, `❌ | **${query}** not found!`, 10000);
-
-            this.client.queue.addTrack(track);
+            }).then(x => x);
         }
 
+        if (tracks.playlist)
+            this.client.queue.addTracks(tracks.tracks);
+        else
+            this.client.queue.addTrack(tracks.tracks[0]);
         if (startPlay)
             this.client.queue.play();
+
     }
 
     pause(m, u) {
@@ -195,7 +192,6 @@ class MusicPlayer extends Player {
         if (!this.checkVC(m, m.author)) return;
         try {
             const track = this.client.queue.remove(Number(pos) - 1);
-            console.log(track);
             sendThenDelete(m, `[${track.title}](${track.url}) was removed by ${m.author}`);
             this.emit('queueUpdated', this.client.queue);
         } catch (e) {
@@ -234,7 +230,7 @@ class MusicPlayer extends Player {
     }
 }
 
-function updateQueue(queue) {
+function updatePlaylist(queue) {
     const list = queue.tracks.slice(0, 20).reverse();
     let content = '';
     let count = (queue.tracks.length > 20) ? 21 : queue.tracks.length + 1;
@@ -275,4 +271,4 @@ function uniqBy(a, key) {
     })
 }
 
-module.exports = { MusicPlayer, updateQueue };
+module.exports = { MusicPlayer, updatePlaylist };

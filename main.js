@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { Client, Intents, MessageEmbed, } = require('discord.js');
-const { MusicPlayer, updateQueue } = require('./player');
+const { MusicPlayer, updatePlaylist } = require('./player');
+const { sendThenDelete } = require('./util')
 
 const client = new Client({
 	intents:
@@ -39,31 +40,33 @@ player.on('trackStart', (queue, track) => {
 		.setFields([{ name: 'Channel', value: `[${track.author}](${channelUrl})`, inline: true }, { name: `Duration`, value: duration, inline: true }])
 		.setImage(track.thumbnail)
 		.setFooter(`${queue.tracks.length} songs in playlist.`);
-	client.Menu.edit({ content: updateQueue(queue), embeds: [Playing] });
+	client.Menu.edit({ content: updatePlaylist(queue), embeds: [Playing] });
 });
 
-player.on('trackSwitch', (queue, track) => {
+player.on('trackEnd', (queue, _) => {
+	if (!queue.tracks) return;
+	
+	const nextTrack = queue.tracks[0];
 	const Playing = client.Menu.embeds[0];
-
-	Playing.setTitle(track.title)
-		.setURL(track.url)
-		.setDescription(`Connecting...`)
+	Playing.setTitle(nextTrack.title)
+		.setURL(nextTrack.url)
+		.setDescription(`Buffering...`)
 		.setFields([])
-		.setImage(track.thumbnail)
+		.setImage(nextTrack.thumbnail)
 		.setFooter(`${queue.tracks.length} songs in playlist.`);
-	client.Menu.edit({ content: updateQueue(queue), embeds: [Playing] });
+	client.Menu.edit({ content: updatePlaylist(queue), embeds: [Playing] });
 });
 
 player.on('trackAdd', (queue, track) => {
 	const Adding = client.Menu.embeds[0];
 	Adding.setFooter(`${queue.tracks.length} songs in playlist.`)
-	client.Menu.edit({ content: updateQueue(queue), embeds: [Adding] });
+	client.Menu.edit({ content: updatePlaylist(queue), embeds: [Adding] });
 });
 
 player.on('tracksAdd', (queue, tracks) => {
 	const Adding = client.Menu.embeds[0];
 	Adding.setFooter(`${queue.tracks.length} songs in playlist.`)
-	client.Menu.edit({ content: updateQueue(queue), embeds: [Adding] });
+	client.Menu.edit({ content: updatePlaylist(queue), embeds: [Adding] });
 });
 
 player.on('queueEnd', (_) => {
@@ -74,7 +77,7 @@ player.on('botDisconnect', (_) => {
 	// ensure queue is deleted after disconnect
 	try {
 		player.client.queue.destroy();
-	} catch { }
+	} catch (e) { console.error(e); }
 
 	client.Menu.edit({ content: ' ', embeds: [NothingPlaying()] });
 });
@@ -84,27 +87,31 @@ player.on('stopped', (_) => {
 });
 
 player.on('shuffled', (queue) => {
-	client.Menu.edit({ content: updateQueue(queue), embeds: client.Menu.embeds });
+	client.Menu.edit({ content: updatePlaylist(queue), embeds: client.Menu.embeds });
 });
 
 player.on('cleared', (queue) => {
 	const update = client.Menu.embeds[0];
 	update.setFooter(`${queue.tracks.length} songs in playlist.`)
-	client.Menu.edit({ content: updateQueue(queue), embeds: client.Menu.embeds });
+	client.Menu.edit({ content: updatePlaylist(queue), embeds: client.Menu.embeds });
 });
 
 player.on('queueUpdated', (queue) => {
 	const update = client.Menu.embeds[0];
 	update.setFooter(`${queue.tracks.length} songs in playlist.`)
-	client.Menu.edit({ content: updateQueue(queue), embeds: [update] });
+	client.Menu.edit({ content: updatePlaylist(queue), embeds: [update] });
 });
 
-player.on('error', (_, error) => {
-	if (error.name == 'DestroyedQueue') return;
-	console.error(error);
+player.on('playError', (_, track, error) => {
+	sendThenDelete(client.Menu, `Error when playling [${track.title}](${track.url}):\n**${error.message}**`, 10000);
 });
 
 player.on('connectionError', (_, error) => {
+	console.error(error);
+});
+
+player.on('error', (_, error) => {
+	if (error.message == '[DestroyedQueue] Cannot use destroyed queue') return;
 	console.error(error);
 });
 
@@ -162,7 +169,7 @@ client.on('messageCreate', (m) => {
 		if (m.content.startsWith('.')) {
 			let command = m.content.slice(1);
 			if (m.author.id == process.env.OWNER) {
-				if (command == 'init')
+				if (command == 'init' && client.Menu === null)
 					initMenu(m);
 				else if (command == 'dc')
 					player.emit('botDisconnect', player.getQueue(m.guildId));
