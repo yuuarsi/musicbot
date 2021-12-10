@@ -171,7 +171,7 @@ client.on('messageCreate', (m) => {
 					emptyImg = command;
 				}
 			}
-			else if (command.startsWith('bump') || command.startsWith('move'))
+			if (command.startsWith('bump') || command.startsWith('move'))
 				player.bump(m, command.slice(4).trim());
 			else if (command.startsWith('mv'))
 				player.bump(m, command.slice(2).trim());
